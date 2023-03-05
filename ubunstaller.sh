@@ -1,35 +1,69 @@
 #!/bin/bash
 
-# Add the necessary repositories
-sudo add-apt-repository -y ppa:videolan/stable-daily
-sudo add-apt-repository -y ppa:inkscape.dev/stable
-sudo add-apt-repository -y ppa:transmissionbt/ppa
-sudo add-apt-repository -y ppa:otto-kesselgulasch/gimp
-sudo add-apt-repository -y ppa:otto-kesselgulasch/spotify
-sudo add-apt-repository -y ppa:qbittorrent-team/qbittorrent-stable
-sudo add-apt-repository -y ppa:ubuntu-mozilla-security/ppa
-sudo add-apt-repository -y ppa:webupd8team/y-ppa-manager
-sudo add-apt-repository -y ppa:thomas-schiex/blender
-sudo add-apt-repository -y ppa:flameshot-dev/stable
-wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.asc.gpg
-sudo install -o root -g root -m 644 microsoft.asc.gpg /etc/apt/trusted.gpg.d/
-sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
+function install_chrome() {
+  if [ ! -f "google-chrome-stable_current_amd64.deb" ]; then
+    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+  fi
+  dpkg -i google-chrome-stable_current_amd64.deb
+  apt --fix-broken install
+  rm google-chrome-stable_current_amd64.deb
+}
 
-# Update the repositories
-sudo apt-get update
+function install_vscode() {
+  if ! grep -q "packages.microsoft.com/repos/vscode" /etc/apt/sources.list.d/*; then
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+    install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
+    rm packages.microsoft.gpg
+    echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" | tee /etc/apt/sources.list.d/vscode.list
+  fi
+}
 
-# Install the applications
-sudo apt-get install -y vlc firefox google-chrome-stable gimp steam transmission audacity inkscape spotify-client thunderbird dropbox python3-psutil python3-xlib python3-tk python3-gi python3-gi-cairo python3-dbus python3-dev python3-pil python3-pil.imagetk wine flameshot code git
+function update_repositories() {
+  apt update
+}
 
-# Install Docker and Docker Compose
-sudo apt-get install -y docker.io docker-compose
+function install_apps() {
+  apt install -y \
+    code \
+    firefox \
+    flameshot \
+    git \
+    gimp \
+    npm \
+    steam \
+    thunderbird \
+    transmission \
+    vim \
+    vlc \
+    wget
+}
 
-# Add the current user to the docker group
-sudo usermod -aG docker $USER
+function install_docker() {
+  if ! command -v docker &> /dev/null; then
+    apt install -y docker.io docker-compose
+  fi
+}
 
-# Restart the Docker service
-sudo systemctl restart docker
+function add_user_to_docker_group() {
+  if groups $USER | grep -q "\bdocker\b"; then
+    echo "User is already in docker group."
+  else
+    usermod -aG docker $USER
+    echo "User added to docker group."
+  fi
+}
 
-echo "Installation complete! Please logout and login again so that the Docker group configuration can be applied."
+function restart_docker() {
+  systemctl restart docker
+}
+    
+install_chrome
+install_vscode
+
+update_repositories
+install_apps
+
+install_docker
+add_user_to_docker_group
+
+restart_docker
